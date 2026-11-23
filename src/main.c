@@ -36,9 +36,18 @@
 /* -----------------------------------------------------------------------
  * find_autoload_config
  *
- * Searches for ps5_autoloader/autoload.txt in order:
+ * Searches for dedicated Linux autoload configuration in order:
  *   /mnt/usb0 .. /mnt/usb7  (highest priority)
  *   /data                   (fallback)
+ *
+ * Supported files (in order):
+ *   autoload-linux/autoload-linux.txt
+ *   autoload-linux/autoload-linux
+ *   autoload-linux.txt
+ *   autoload-linux
+ *
+ * NOTE: Never searches for autoload.txt, avoiding collisions with the
+ * default WebKit / BD-JB / Y2JB autoloaders.
  *
  * Writes the found path into out_buf (size out_size).
  * Returns 0 on success (found), -1 if not found.
@@ -46,41 +55,26 @@
 static int find_autoload_config(char *out_buf, size_t out_size) {
     struct stat st;
 
-    /* Check Title ID specific paths first if we have a title ID */
-    if (g_entry_point_id[0] != '\0') {
-        for (int i = 0; i < USB_COUNT; i++) {
-            snprintf(out_buf, out_size, "%s/ps5_autoloader_%s/autoload.txt", USB_BASES[i], g_entry_point_id);
+    /* Check each USB base in priority order */
+    for (int i = 0; i < USB_COUNT; i++) {
+        for (size_t s = 0; s < AUTOLOAD_LINUX_SUBPATH_COUNT; s++) {
+            snprintf(out_buf, out_size, "%s/%s", USB_BASES[i], AUTOLOAD_LINUX_SUBPATHS[s]);
             if (stat(out_buf, &st) == 0) {
-                printf("[autoloader] Found config on USB%d: %s\n", i, out_buf);
+                printf("[autoloader-linux] Found Linux config on USB%d: %s\n", i, out_buf);
                 fflush(stdout);
                 return 0;
             }
         }
-
-        snprintf(out_buf, out_size, "%s/ps5_autoloader_%s/autoload.txt", DATA_BASE, g_entry_point_id);
-        if (stat(out_buf, &st) == 0) {
-            printf("[autoloader] Found config in /data: %s\n", out_buf);
-            fflush(stdout);
-            return 0;
-        }
-    }
-
-    /* Check each USB base in priority order */
-    for (int i = 0; i < USB_COUNT; i++) {
-        snprintf(out_buf, out_size, "%s/%s", USB_BASES[i], AUTOLOAD_CONFIG_SUBPATH);
-        if (stat(out_buf, &st) == 0) {
-            printf("[autoloader] Found config on USB%d: %s\n", i, out_buf);
-            fflush(stdout);
-            return 0;
-        }
     }
 
     /* Fallback: /data */
-    snprintf(out_buf, out_size, "%s/%s", DATA_BASE, AUTOLOAD_CONFIG_SUBPATH);
-    if (stat(out_buf, &st) == 0) {
-        printf("[autoloader] Found config in /data: %s\n", out_buf);
-        fflush(stdout);
-        return 0;
+    for (size_t s = 0; s < AUTOLOAD_LINUX_SUBPATH_COUNT; s++) {
+        snprintf(out_buf, out_size, "%s/%s", DATA_BASE, AUTOLOAD_LINUX_SUBPATHS[s]);
+        if (stat(out_buf, &st) == 0) {
+            printf("[autoloader-linux] Found Linux config in /data: %s\n", out_buf);
+            fflush(stdout);
+            return 0;
+        }
     }
 
     out_buf[0] = '\0';
@@ -227,23 +221,38 @@ int main(void) {
         return -1;
     }
 
-    /* Step 5: locate autoload.txt */
+    /* Step 5: locate autoload-linux config */
     char config_path[512];
     int found = (find_autoload_config(config_path, sizeof(config_path)) == 0);
 
     if (found) {
         /* Step 6a: run the autoload sequence from config */
-        autoloader_notify("Found autoload config:\n%s", config_path);
+        autoloader_notify("Found Linux autoload config:\n%s", config_path);
         run_autoload_sequence(config_path);
     } else {
-        /* Step 6b: no config — fall back to embedded pldmgr */
-        printf("[autoloader] No autoload config found. Starting Payload Manager...\n");
-        fflush(stdout);
-        if (launch_elf_from_memory(pldmgr_elf, pldmgr_elf_len) != 0) {
-            autoloader_notify("ERROR: failed to launch Payload Manager");
-            printf("[autoloader] ERROR: failed to launch pldmgr\n");
+        /* Step 6b: no config — check if default Bazzite bootc loader exists */
+        struct stat bst;
+        if (stat(BAZZITE_LOADER_FALLBACK_PATH, &bst) == 0) {
+            printf("[autoloader-linux] No config found. Launching default Bazzite loader: %s\n", BAZZITE_LOADER_FALLBACK_PATH);
             fflush(stdout);
-            return -1;
+            autoloader_notify("Launching Bazzite Linux Loader...");
+            if (launch_elf_from_file(BAZZITE_LOADER_FALLBACK_PATH) != 0) {
+                autoloader_notify("ERROR: Failed to launch Bazzite loader");
+                printf("[autoloader-linux] ERROR: failed to launch %s\n", BAZZITE_LOADER_FALLBACK_PATH);
+                fflush(stdout);
+                return -1;
+            }
+        } else {
+            /* Step 6c: neither config nor Bazzite loader found — fall back to embedded pldmgr */
+            printf("[autoloader-linux] No Linux config or Bazzite loader found at %s. Starting Payload Manager...\n", BAZZITE_LOADER_FALLBACK_PATH);
+            fflush(stdout);
+            autoloader_notify("Linux payload not found. Starting Payload Manager...");
+            if (launch_elf_from_memory(pldmgr_elf, pldmgr_elf_len) != 0) {
+                autoloader_notify("ERROR: failed to launch Payload Manager");
+                printf("[autoloader-linux] ERROR: failed to launch pldmgr\n");
+                fflush(stdout);
+                return -1;
+            }
         }
     }
 
