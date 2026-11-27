@@ -20,9 +20,12 @@ When loaded via elfldr (e.g. as part of the WebKit Linux Loader):
    - **Internal**: `/data/autoload-linux`
    *(NOTE: Never looks for `autoload.txt`, completely preventing collisions with other loaders)*
 5. **If config is found**: launches each payload listed in the config via `elfldr:9021`.
-6. **If config is NOT found**: automatically checks for the default Bazzite bootc loader:
-   `/data/pldmgr/payloads/local/bazzite-bootc-loader/bazzite-bootc-loader-v3.0.1.elf`
-   and launches it directly!
+6. **If config is NOT found**: looks for the Bazzite bootc loader in
+   `/data/pldmgr/payloads/local/bazzite-bootc-loader/` and launches it directly:
+   - `bazzite-bootc-loader.elf` (unversioned name) if present — rename a build to this to pin it;
+   - otherwise the **highest version** of `bazzite-bootc-loader-v<X.Y.Z>.elf`
+     (compared numerically, so `v3.0.10` beats `v3.0.9`; `.sha256`/`.inputs` files are ignored).
+   Just drop the new release ELF into that folder — no renaming or config edits needed.
 7. **If neither is found**: falls back to starting the embedded **Payload Manager** for recovery.
 
 ## Config format (`autoload-linux` / `autoload-linux.txt`)

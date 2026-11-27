@@ -18,7 +18,7 @@ TARGET := $(SDK)/target
 # -I. lets the compiler find pldmgr_elf.c generated in the project root
 INCLUDES := -I. -Iinclude -I$(TARGET)/include
 LIBS     := -lSceSystemService -lSceUserService -lSceNetCtl -lpthread
-SRCS     := src/main.c src/launcher.c src/app_killer.c src/notification.c src/sync.c
+SRCS     := src/main.c src/launcher.c src/app_killer.c src/notification.c src/sync.c src/bazzite.c
 CFLAGS   := -Os -Wall -ffunction-sections -fdata-sections
 LDFLAGS  := -Wl,--gc-sections
 
@@ -29,7 +29,7 @@ PLDMGR_ELF_C := pldmgr_elf.c
 # -----------------------------------------------------------------------
 # Targets
 # -----------------------------------------------------------------------
-.PHONY: all clean dist-clean
+.PHONY: all clean dist-clean test
 
 all: $(ELF)
 
@@ -47,8 +47,14 @@ $(ELF): $(PLDMGR_ELF_C) $(SRCS)
 	$(STRIP) $@
 	@echo "Done: $(ELF)"
 
+# Host-side unit tests (plain cc, no PS5 SDK needed)
+HOST_CC ?= cc
+test:
+	$(HOST_CC) -Wall -Wextra -Werror -Iinclude -o tests/test_bazzite tests/test_bazzite.c src/bazzite.c
+	./tests/test_bazzite
+
 clean:
-	rm -f $(ELF) $(PLDMGR_ELF_C)
+	rm -f $(ELF) $(PLDMGR_ELF_C) tests/test_bazzite
 
 dist-clean: clean
 	rm -f $(PLDMGR_ELF)
