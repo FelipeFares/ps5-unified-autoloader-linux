@@ -4,7 +4,7 @@
  * ps5-autoloader — version & config
  * ----------------------------------------------------------------------- */
 
-#define AUTOLOADER_VERSION "0.1.7-linux"
+#define AUTOLOADER_VERSION "0.1.8-linux"
 
 /* Port that elfldr (socksrv) listens on for incoming ELF payloads */
 #define ELFLDR_PORT 9021
@@ -17,9 +17,6 @@ static const char * const AUTOLOAD_LINUX_SUBPATHS[] = {
     "autoload-linux"
 };
 #define AUTOLOAD_LINUX_SUBPATH_COUNT (sizeof(AUTOLOAD_LINUX_SUBPATHS) / sizeof(AUTOLOAD_LINUX_SUBPATHS[0]))
-
-/* Direct fallback to Bazzite bootc loader if no config file is found */
-#define BAZZITE_LOADER_FALLBACK_PATH "/data/pldmgr/payloads/local/bazzite-bootc-loader/bazzite-bootc-loader-v3.0.1.elf"
 
 /* Fallback search base when no USB config is found */
 #define DATA_BASE "/data"

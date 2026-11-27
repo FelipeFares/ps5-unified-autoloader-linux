@@ -12,6 +12,7 @@
  */
 
 #include "autoloader.h"
+#include "bazzite.h"
 #include "app_killer.h"
 #include "launcher.h"
 #include "notification.h"
@@ -230,21 +231,21 @@ int main(void) {
         autoloader_notify("Found Linux autoload config:\n%s", config_path);
         run_autoload_sequence(config_path);
     } else {
-        /* Step 6b: no config — check if default Bazzite bootc loader exists */
-        struct stat bst;
-        if (stat(BAZZITE_LOADER_FALLBACK_PATH, &bst) == 0) {
-            printf("[autoloader-linux] No config found. Launching default Bazzite loader: %s\n", BAZZITE_LOADER_FALLBACK_PATH);
+        /* Step 6b: no config — look for the newest Bazzite bootc loader */
+        char bazzite_path[512];
+        if (bazzite_find_loader(BAZZITE_LOADER_DIR, bazzite_path, sizeof(bazzite_path)) == 0) {
+            printf("[autoloader-linux] No config found. Launching Bazzite loader: %s\n", bazzite_path);
             fflush(stdout);
-            autoloader_notify("Launching Bazzite Linux Loader...");
-            if (launch_elf_from_file(BAZZITE_LOADER_FALLBACK_PATH) != 0) {
+            autoloader_notify("Launching Bazzite Linux Loader:\n%s", bazzite_path);
+            if (launch_elf_from_file(bazzite_path) != 0) {
                 autoloader_notify("ERROR: Failed to launch Bazzite loader");
-                printf("[autoloader-linux] ERROR: failed to launch %s\n", BAZZITE_LOADER_FALLBACK_PATH);
+                printf("[autoloader-linux] ERROR: failed to launch %s\n", bazzite_path);
                 fflush(stdout);
                 return -1;
             }
         } else {
             /* Step 6c: neither config nor Bazzite loader found — fall back to embedded pldmgr */
-            printf("[autoloader-linux] No Linux config or Bazzite loader found at %s. Starting Payload Manager...\n", BAZZITE_LOADER_FALLBACK_PATH);
+            printf("[autoloader-linux] No Linux config or Bazzite loader found in %s. Starting Payload Manager...\n", BAZZITE_LOADER_DIR);
             fflush(stdout);
             autoloader_notify("Linux payload not found. Starting Payload Manager...");
             if (launch_elf_from_memory(pldmgr_elf, pldmgr_elf_len) != 0) {
